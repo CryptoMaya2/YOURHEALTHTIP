@@ -1,3 +1,5 @@
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
 from dataclasses import dataclass
 from genlayer import *
 import json
@@ -14,7 +16,7 @@ class HealthTipData:
     submitted_at: str
     status: str
     has_review: bool
-    review_confidence: int
+    review_confidence: u32
     review_reasoning: str
     review_sources: str
     reviewed_at: str
@@ -33,10 +35,10 @@ class YourHealthTip(gl.Contract):
     """
     tips: TreeMap[str, HealthTipData]
     tip_ids: DynArray[str]
-    total_tips: int
+    total_tips: u32
 
     def __init__(self):
-        self.total_tips = 0
+        self.total_tips = u32(0)
 
     @gl.public.write
     def submit_tip(
@@ -83,7 +85,7 @@ class YourHealthTip(gl.Contract):
             submitted_at="Recorded On-Chain",
             status="pending",
             has_review=False,
-            review_confidence=0,
+            review_confidence=u32(0),
             review_reasoning="Queued for GenLayer validator multi-source evidence evaluation.",
             review_sources="",
             reviewed_at="",
@@ -95,7 +97,7 @@ class YourHealthTip(gl.Contract):
 
         self.tips[clean_id] = new_tip
         self.tip_ids.append(clean_id)
-        self.total_tips = self.total_tips + 1
+        self.total_tips = u32(self.total_tips + 1)
 
         return clean_id
 
@@ -117,49 +119,24 @@ class YourHealthTip(gl.Contract):
         category_text = target_tip.category
         source_url_clean = primary_source_url.strip()
 
-        # Non-deterministic evaluation block executed by leader and verified by consensus
-        def evaluate_evidence() -> str:
-            source_content = ""
-            if source_url_clean.startswith("http://") or source_url_clean.startswith("https://"):
-                try:
-                    web_html = gl.nondet.web.render(source_url_clean, mode="html")
-                    source_content = web_html[:4000]
-                except Exception:
-                    source_content = f"Could not retrieve live URL ({source_url_clean}); relying on benchmark health literature."
-
-            prompt = f"""
-You are an expert public health literature analyst for YourHealthTip.
-Evaluate whether the following everyday healthy living tip is consistent with established, trusted public health consensus (such as WHO, CDC, or peer-reviewed medical guidance).
-
-CRITICAL MEDICAL SAFETY & EVIDENCE RULES:
-1. Health information is general education, NEVER individual medical diagnosis or prescription treatment.
-2. If a tip claims an unverified "cure", recommends stopping prescribed medication, or poses direct physiological hazards, mark as 'evidence-inconsistent'.
-3. If the tip is well-supported general advice (e.g. handwashing, gentle walks, sleep hygiene, hydration, circadian light), mark as 'evidence-consistent'.
-4. If literature is conflicting or data is insufficient, mark as 'undetermined'.
-5. Do not certify tips as clinical medical guarantees.
-
-TIP DATA:
-- Title: {title_text}
-- Category: {category_text}
-- Claim / Text: {content_text}
-- Reference Context (if available): {source_content}
-
-Respond ONLY with a valid JSON object matching this exact schema:
-{{
-  "status": "evidence-consistent" | "evidence-inconsistent" | "undetermined",
-  "confidence": <integer between 50 and 99>,
-  "reasoning": "<concise explanation of why this matches or contradicts established literature in 2 to 4 sentences>",
-  "sources": "<names of benchmark organizations, e.g. WHO, CDC, PubMed, or cited URL>"
-}}
-"""
-            raw_response = gl.nondet.exec_prompt(prompt)
-            return raw_response
+        # Prepare claim context for validator consensus
+        eval_input = f"Tip Title: {title_text}\nCategory: {category_text}\nClaim: {content_text}"
+        if source_url_clean:
+            eval_input += f"\nProvided Evidence Source URL: {source_url_clean}"
 
         # Reach consensus across validators using Equivalence Principle
         consensus_json_str = gl.eq_principle.prompt_non_comparative(
-            evaluate_evidence,
-            task="Evaluate healthy living claim consistency against public health guidelines and output JSON.",
-            criteria="Output must be a valid JSON object containing status, confidence, reasoning, and sources fields."
+            input=eval_input,
+            task="""Evaluate whether this everyday healthy living tip is consistent with established, trusted public health consensus (such as WHO, CDC, or peer-reviewed medical guidance).
+Output MUST be a single valid JSON object with:
+- "status": "evidence-consistent" | "evidence-inconsistent" | "undetermined"
+- "confidence": integer between 50 and 99
+- "reasoning": concise explanation in 2 to 4 sentences
+- "sources": names of benchmark health organizations or cited literature""",
+            criteria="""Output must be valid JSON containing status, confidence, reasoning, and sources.
+- Safe, standard general healthy living advice (hydration, sleep hygiene, walking) must be 'evidence-consistent'.
+- Dangerous claims, fake cures, or hazardous physiological advice must be 'evidence-inconsistent'.
+- Conflicting or unsupported claims must be 'undetermined'."""
         )
 
         status_val = "undetermined"
@@ -208,7 +185,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
             submitted_at=target_tip.submitted_at,
             status=status_val,
             has_review=True,
-            review_confidence=confidence_val,
+            review_confidence=u32(confidence_val),
             review_reasoning=reasoning_val,
             review_sources=sources_val,
             reviewed_at="Finalized On-Chain",
@@ -337,7 +314,7 @@ Respond ONLY with a valid JSON object matching this exact schema:
         return self.tip_ids
 
     @gl.public.view
-    def get_tip_count(self) -> int:
+    def get_tip_count(self) -> u32:
         """
         Returns total number of tips submitted.
         """

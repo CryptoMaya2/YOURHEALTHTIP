@@ -13,13 +13,11 @@ class MockTreeMap(dict):
 class MockDynArray(list):
     pass
 
-# Import or define contract logic for testing
-from your_health_tip import (
-    YourHealthTip, 
-    HealthTipData, 
-    ReviewRecordData, 
-    ChallengeRecordData
-)
+def u32(val):
+    return int(val)
+
+# Import contract logic for testing
+from your_health_tip import YourHealthTip, HealthTipData
 
 class TestYourHealthTipContract(unittest.TestCase):
     def setUp(self):
@@ -27,7 +25,7 @@ class TestYourHealthTipContract(unittest.TestCase):
         self.contract = YourHealthTip()
         self.contract.tips = MockTreeMap()
         self.contract.tip_ids = MockDynArray()
-        self.contract.total_tips = 0
+        self.contract.total_tips = u32(0)
 
     def test_submit_valid_tip(self):
         tip_id = self.contract.submit_tip(
@@ -116,14 +114,10 @@ class TestYourHealthTipContract(unittest.TestCase):
         target = self.contract.tips["tip-007"]
         target.has_review = True
         target.status = "evidence-consistent"
-        target.review = ReviewRecordData(
-            status="evidence-consistent",
-            confidence=85,
-            reasoning="Initial review concluded consistency.",
-            sources_consulted="General Guidelines",
-            reviewed_at="Timestamp",
-            evaluator="GenLayer Validator"
-        )
+        target.review_confidence = u32(85)
+        target.review_reasoning = "Initial review concluded consistency."
+        target.review_sources = "General Guidelines"
+        target.reviewed_at = "Timestamp"
         self.contract.tips["tip-007"] = target
 
         # Challenge the reviewed tip
