@@ -19,7 +19,7 @@ def run_nondet(leader, validator):
 gl = types.SimpleNamespace(Contract=object, public=types.SimpleNamespace(write=lambda f:f,view=lambda f:f),
     message=types.SimpleNamespace(sender_address='0x'+'1'*40),message_raw={'datetime':'2026-10-16T10:00:00Z'},
     vm=types.SimpleNamespace(Return=Return,run_nondet_unsafe=run_nondet),
-    nondet=types.SimpleNamespace(web=types.SimpleNamespace(render=Mock()),exec_prompt=Mock()))
+    nondet=types.SimpleNamespace(web=types.SimpleNamespace(render=Mock(),get=Mock(side_effect=RuntimeError("HTTP unavailable"))),exec_prompt=Mock()))
 stub=types.ModuleType('genlayer'); stub.gl=gl; stub.TreeMap=dict; stub.DynArray=list
 spec=importlib.util.spec_from_file_location('actual_contract',Path(__file__).with_name('your_health_tip.py'))
 module=importlib.util.module_from_spec(spec)
@@ -32,6 +32,8 @@ class ContractTests(unittest.TestCase):
     def setUp(self):
         self.c=module.YourHealthTip();self.c.tips={};self.c.tip_ids=[]
         gl.nondet.web.render.reset_mock(side_effect=True,return_value=True)
+        gl.nondet.web.get.reset_mock(side_effect=True,return_value=True)
+        gl.nondet.web.get.side_effect=RuntimeError('HTTP unavailable')
         gl.nondet.web.render.return_value='Relevant public health evidence. '*30
         gl.nondet.exec_prompt.reset_mock(side_effect=True,return_value=True)
         gl.nondet.exec_prompt.return_value=json.dumps(dict(status='evidence-consistent',confidence=80,reasoning='The source supports this claim.'))
@@ -52,6 +54,12 @@ class ContractTests(unittest.TestCase):
         self.submit();self.c.review_tip('tip1');self.assertEqual(gl.nondet.web.render.call_count,2)
         self.assertEqual(len(self.tip()['reviews']),1)
         self.assertTrue(self.tip()['review']['sources'][0]['url'].startswith('https://www.who.int/'))
+    def test_http_fallback_after_render_failure(self):
+        self.submit();gl.nondet.web.render.side_effect=RuntimeError('renderer unavailable')
+        gl.nondet.web.get.side_effect=None
+        gl.nondet.web.get.return_value=types.SimpleNamespace(status=200,body=('<main>'+'Public health evidence. '*40+'</main>').encode())
+        self.assertEqual(self.c.review_tip('tip1'),'evidence-consistent')
+        self.assertEqual(gl.nondet.web.get.call_count,2)
     def test_missing_evidence_is_undetermined(self):
         self.submit();gl.nondet.web.render.side_effect=RuntimeError('offline')
         self.assertEqual(self.c.review_tip('tip1'),'undetermined');gl.nondet.exec_prompt.assert_not_called()
