@@ -41,7 +41,7 @@ export class GenLayerTipService implements ITipService {
     const status = String(receipt.statusName || receipt.status);
     if (!['ACCEPTED','FINALIZED','5','7'].includes(status)
         || (receipt.txExecutionResultName && receipt.txExecutionResultName !== 'FINISHED_WITH_RETURN')
-        || receipt.consensus_data?.leader_receipt?.some(r => r.error || /error|fail|revert/i.test(r.execution_result))) {
+        || receipt.consensus_data?.leader_receipt?.some(r => r.mode === 'leader' && (r.error || /error|fail|revert/i.test(r.execution_result)))) {
       throw new Error(`Transaction ${hash} did not succeed (${status}). Check its receipt before retrying.`);
     }
     try {
