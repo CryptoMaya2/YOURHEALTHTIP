@@ -24,7 +24,7 @@ export class GenLayerTipService implements ITipService {
 
   constructor() {
     const envAddress = import.meta.env.VITE_GENLAYER_CONTRACT_ADDRESS;
-    if (envAddress && envAddress.startsWith('0x')) {
+    if (envAddress && /^0x[0-9a-fA-F]{40}$/.test(envAddress)) {
       this.contractAddress = envAddress as `0x${string}`;
     }
 
@@ -233,8 +233,7 @@ export class GenLayerTipService implements ITipService {
   }
 
   async flagTip(_tipId: string, _reason: string): Promise<boolean> {
-    // Flagging remains local / moderation-side in this phase
-    return true;
+    throw new Error('On-chain moderation reports are not implemented yet. No report was saved.');
   }
 
   async resetToDefaultSampleData(): Promise<void> {

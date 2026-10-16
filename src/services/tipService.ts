@@ -217,18 +217,11 @@ class MockTipService implements ITipService {
 import { GenLayerTipService } from './genlayerTipService';
 export { MockTipService, GenLayerTipService };
 
-// Active service resolver: defaults to MockTipService to keep app working until contract is deployed
+// An explicitly selected network service must never silently switch to demo data.
 export function getActiveTipService(): ITipService {
-  if (import.meta.env.VITE_USE_GENLAYER_CONTRACT === 'true') {
-    const genlayerService = new GenLayerTipService();
-    if (genlayerService.isConfigured()) {
-      return genlayerService;
-    }
-    console.warn('VITE_USE_GENLAYER_CONTRACT is true, but contract address is not configured. Falling back to MockTipService.');
-  }
-  return new MockTipService();
+  return import.meta.env.VITE_USE_GENLAYER_CONTRACT === 'true'
+    ? new GenLayerTipService()
+    : new MockTipService();
 }
 
-// Export default singleton service instance
-export const tipService: ITipService = new MockTipService();
-
+export const tipService: ITipService = getActiveTipService();
