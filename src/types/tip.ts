@@ -155,6 +155,8 @@ export interface HealthTip {
   challenges?: Challenge[];
   isSampleData: boolean;
   flagCount?: number;
+  reviewHistory?: ReviewRecord[];
+  transactions?: Record<string, string>;
 }
 
 export interface CreateTipInput {
