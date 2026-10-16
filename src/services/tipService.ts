@@ -17,23 +17,14 @@ export interface TipFilterOptions {
   currentUserOnly?: boolean;
 }
 
-/**
- * Dedicated Service Interface for Health Tip operations.
- * 
- * FUTURE GENLAYER INTEGRATION NOTE:
- * When the real GenLayer Intelligent Contract is deployed, an implementation of this interface
- * (e.g. `GenLayerTipService`) will replace `MockTipService`.
- * The contract will handle:
- * 1. Non-deterministic web retrieval of cited/specified public health sources.
- * 2. Validator consensus on whether the tip text is consistent with those sources.
- * 3. On-chain state storage of tips, challenge disputes, and validator voting outcomes.
- */
+// Shared interface for local demonstration and GenLayer v2 services.
 export interface ITipService {
   listTips(options?: TipFilterOptions): Promise<HealthTip[]>;
   getTip(id: string): Promise<HealthTip | null>;
   submitTip(input: CreateTipInput): Promise<HealthTip>;
   challengeTip(input: SubmitChallengeInput): Promise<HealthTip>;
   getReviewRecord(tipId: string): Promise<ReviewRecord | null>;
+  reviewTip(tipId: string, sourceUrl?: string): Promise<HealthTip>;
   flagTip(tipId: string, reason: string): Promise<boolean>;
   resetToDefaultSampleData(): Promise<void>;
 }
@@ -191,6 +182,10 @@ class MockTipService implements ITipService {
     this.saveToStorage();
 
     return { ...updatedTip };
+  }
+
+  async reviewTip(_tipId: string): Promise<HealthTip> {
+    throw new Error('Live evidence review requires GenLayer mode and a connected wallet.');
   }
 
   async getReviewRecord(tipId: string): Promise<ReviewRecord | null> {
