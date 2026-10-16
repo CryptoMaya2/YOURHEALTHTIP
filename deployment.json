@@ -1,0 +1,37 @@
+{
+  "network": "GenLayer Studio",
+  "chainId": 61999,
+  "contractAddress": "0x282EfF036702383110b4644f1f02b20062C631Bd",
+  "deploymentTransaction": "0x163a915b25334e7f949dee498765281ea11cf252eee0c56467d63b07de5df7d5",
+  "deployer": "0x4C7692Aca2bcfB8B6Cf31668E5b1b9EadFC46D3E",
+  "contractVersion": "2",
+  "sourceSha256": "32ac1288afd63eb75d1d86e305b1fd74046453f93615b7a44918eeafc0b071b5",
+  "deploymentStatus": "ACCEPTED",
+  "validatorVotes": "5 agree / 5",
+  "liveTests": {
+    "schemaValidation": "passed",
+    "deployment": "passed",
+    "submission": "passed",
+    "sourceGroundedReview": "passed",
+    "challengeAndRereview": "passed",
+    "reportCount": "passed",
+    "frontendAdapterRead": "passed",
+    "disconnectedWalletGuard": "passed"
+  },
+  "browserWalletTest": "not yet run",
+  "lifecycleTransactions": {
+    "submission": "0x57f7dbdde16367681229b62b6e3cb08d839f28cb9541c38b353597f0cb3e47d7",
+    "initialReview": "0xdf28ac1758c9ef3712fe9a466d1c83092188457160da39201551edb21b171958",
+    "challenge": "0x8289f07a686bfdb47b16fb8f2067c3b4d68ffedaa2091253430c0459324e4b93",
+    "rereview": "0xe0e1df813539ae3762db59ae5cc3906ffa78754f7377950a1cae30891d55189f",
+    "report": "0xf7684b2250497de1ed3a2616bb99f60b9feaf27c075f0f7d9d4b7e4b692b0442"
+  },
+  "testTipId": "test-walk-1792145671851",
+  "testResult": {
+    "status": "evidence-consistent",
+    "reviewCount": 2,
+    "challengeStatus": "resolved",
+    "flagCount": 1
+  },
+  "localTestsPassed": 12
+}

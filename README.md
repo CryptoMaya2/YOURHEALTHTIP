@@ -37,4 +37,13 @@ Submitted and accepted transaction hashes are cached in the submitting browser, 
 
 ## Release status
 
-Wallet connection, signed adapter calls, review controls, source retrieval, ownership filtering, report counts and review/challenge history are implemented. Live schema validation, fresh deployment, browser-wallet signing and end-to-end network consensus must still be verified. Keep `main` unchanged until those checks pass.
+Wallet connection, signed adapter calls, review controls, source retrieval, ownership filtering, report counts and review/challenge history are implemented. The current Studio deployment is recorded in `deployment.json`. Live schema validation, deployment, submission, evidence review, challenge/re-review, report counting and adapter reads have passed. Browser-wallet signing still needs an interactive test. Keep `main` unchanged until those checks pass.
+
+## Current Studio deployment
+
+Contract: `0x282EfF036702383110b4644f1f02b20062C631Bd` (chain 61999).
+The address is prefilled in `.env.example`; copy it to `.env.local` and set `VITE_USE_GENLAYER_CONTRACT=true` to enable network mode. A production host must set the same environment values and rebuild. This deployment is on Studio, not Bradbury or mainnet.
+
+The renderer can fail on a source page, so evidence retrieval falls back to an HTTP GET and removes scripts, styles and HTML tags. If neither fetch yields usable evidence, the review stays undetermined and records a bounded diagnostic message. Test cases cover this fallback.
+
+The adapter ignores validator executions cancelled after quorum when the leader succeeded. A cancelled validator alone is not a failed transaction. Deployment and lifecycle transaction references, with the exact source hash, are kept in `deployment.json`.
