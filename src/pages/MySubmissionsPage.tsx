@@ -1,4 +1,5 @@
 import React from 'react';
+import { isOnChain, getWalletAddress } from '../services/wallet';
 import type { HealthTip } from '../types/tip';
 import { StatusBadge } from '../components/StatusBadge';
 import { CategoryBadge } from '../components/CategoryBadge';
@@ -25,7 +26,7 @@ export const MySubmissionsPage: React.FC<MySubmissionsPageProps> = ({
   onResetSampleData
 }) => {
   // Submissions created by the current demo user
-  const userSubmissions = tips.filter((t) => t.isCurrentUserSubmission);
+  const userSubmissions = tips.filter((t) => isOnChain ? t.submittedBy.toLowerCase() === getWalletAddress()?.toLowerCase() : t.isCurrentUserSubmission);
 
   const pendingCount = userSubmissions.filter((t) => t.status === 'pending').length;
   const consistentCount = userSubmissions.filter((t) => t.status === 'evidence-consistent').length;
@@ -101,7 +102,7 @@ export const MySubmissionsPage: React.FC<MySubmissionsPageProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-brand-black)' }}>
-                Demo Contributor (Local Storage Profile)
+                {isOnChain ? getWalletAddress() || 'Connect your wallet to see your submissions' : 'Demo Contributor (Local Storage Profile)'}
               </span>
               <span style={{
                 fontSize: '0.675rem',
@@ -111,16 +112,17 @@ export const MySubmissionsPage: React.FC<MySubmissionsPageProps> = ({
                 borderRadius: '4px',
                 border: '1px solid var(--color-border-subtle)'
               }}>
-                Browser Sandbox
+                {isOnChain ? 'GenLayer Studio' : 'Browser Sandbox'}
               </span>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: 0 }}>
-              Your submissions persist locally in your browser session. No wallet signature or on-chain transaction fees required for this release.
+              {isOnChain ? 'Submissions are matched to the connected wallet address recorded by the contract.' : 'Your demo submissions persist locally in this browser.'}
             </p>
           </div>
         </div>
 
         <button
+          hidden={isOnChain}
           onClick={onResetSampleData}
           className="btn btn-outline btn-sm"
           title="Reset demonstration tips to initial seed state"

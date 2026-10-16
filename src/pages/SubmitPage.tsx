@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Category, HealthTip } from '../types/tip';
 import { CATEGORIES } from '../types/tip';
+import { isOnChain } from '../services/wallet';
 import { tipService } from '../services/tipService';
 import { 
   PlusCircle, 
@@ -73,8 +74,8 @@ export const SubmitPage: React.FC<SubmitPageProps> = ({
     for (const src of cleanSources) {
       try {
         const parsed = new URL(src);
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          errs.sources = 'Supporting sources must be valid web URLs starting with http:// or https://.';
+        if (isOnChain ? (parsed.protocol !== 'https:' || !['who.int','www.who.int','cdc.gov','www.cdc.gov','nhs.uk','www.nhs.uk','pubmed.ncbi.nlm.nih.gov','pmc.ncbi.nlm.nih.gov'].includes(parsed.hostname) || !!parsed.username || !!parsed.password || !!parsed.port) : !['http:', 'https:'].includes(parsed.protocol)) {
+          errs.sources = 'Use HTTPS links from WHO, CDC, NHS or PubMed/PMC.';
           break;
         }
       } catch {
@@ -207,7 +208,7 @@ export const SubmitPage: React.FC<SubmitPageProps> = ({
             <strong style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--color-brand-charcoal)' }}>
               Contract Pipeline Status:
             </strong>
-            This tip is assigned a simulated queue slot. Once the GenLayer Intelligent Contract is deployed, validator nodes will trigger automated non-deterministic consensus to benchmark your submission against WHO, CDC, and PubMed research.
+            {isOnChain ? 'Your submission was accepted on GenLayer. Open its details from My Submissions and select Review evidence to request a validator evaluation.' : 'This is a local demonstration submission. Live reviews require GenLayer mode.'}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
