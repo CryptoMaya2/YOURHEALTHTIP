@@ -19,6 +19,8 @@ export function App() {
   const [tips, setTips] = useState<HealthTip[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // Modals state
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [disclaimerModalOpen, setDisclaimerModalOpen] = useState(false);
@@ -27,11 +29,13 @@ export function App() {
 
   // Load tips on mount
   const refreshTips = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const data = await tipService.listTips();
       setTips(data);
     } catch (err) {
-      console.error('Failed to load tips:', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load health tips. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -107,6 +111,12 @@ export function App() {
             fontWeight: 600
           }}>
             Loading community health repository...
+          </div>
+        ) : loadError ? (
+          <div className="container" role="alert" style={{ padding: '3rem 1rem' }}>
+            <h2>Unable to load health tips</h2>
+            <p>{loadError}</p>
+            <button className="btn btn-primary" onClick={() => void refreshTips()}>Try again</button>
           </div>
         ) : (
           <>
