@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 import type { HealthTip, Category } from './types/tip';
+import { WalletPanel } from './components/WalletPanel';
+import { getWalletAddress, subscribeWallet } from './services/wallet';
 import { tipService } from './services/tipService';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -12,6 +14,7 @@ import { MySubmissionsPage } from './pages/MySubmissionsPage';
 import { AboutModal, DisclaimerModal, PrivacyModal, ContactModal } from './components/InfoModals';
 
 export function App() {
+  const walletAddress = useSyncExternalStore(subscribeWallet, getWalletAddress, () => null);
   const [currentPage, setCurrentPage] = useState<string>('home');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<Category | 'all'>('all');
   const [selectedTipId, setSelectedTipId] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function App() {
 
   useEffect(() => {
     refreshTips();
-  }, []);
+  }, [walletAddress]);
 
   // Handle Navigation
   const handleNavigate = (page: string, params?: { tipId?: string; category?: string }) => {
@@ -98,6 +101,7 @@ export function App() {
         onNavigate={handleNavigate}
       />
 
+      <WalletPanel />
       {/* Main Content View */}
       <main style={{ flex: 1 }}>
         {loading ? (
