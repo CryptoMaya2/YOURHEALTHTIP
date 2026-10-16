@@ -18,6 +18,7 @@ export const FlagModal: React.FC<FlagModalProps> = ({
   const [selectedReason, setSelectedReason] = useState('harmful-claim');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
@@ -31,11 +32,12 @@ export const FlagModal: React.FC<FlagModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setError('');
       setIsSubmitting(true);
       await onFlagSubmitted(tip.id, `${selectedReason}: ${notes}`);
       setSuccess(true);
-    } catch {
-      // Ignore
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Report could not be saved.');
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +103,7 @@ export const FlagModal: React.FC<FlagModalProps> = ({
               Report Received
             </h4>
             <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-              Thank you for keeping YourHealthTip safe. Our moderation system and evidence consensus pipeline will evaluate this report against public safety criteria.
+              Your report count has been recorded. Reporting does not automatically review or remove a tip.
             </p>
             <button onClick={handleClose} className="btn btn-primary" style={{ width: '100%' }}>
               Return to Content
@@ -109,6 +111,7 @@ export const FlagModal: React.FC<FlagModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {error && <p role="alert">{error}</p>}
             <div className="form-group">
               <label className="form-label">Reason for Report</label>
               <select
