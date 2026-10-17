@@ -5,6 +5,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { CategoryBadge } from '../components/CategoryBadge';
 import { ChallengeModal } from '../components/ChallengeModal';
 import { FlagModal } from '../components/FlagModal';
+import { isOnChain } from '../services/wallet';
 import { tipService } from '../services/tipService';
 import { 
   ArrowLeft, 
@@ -37,6 +38,8 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
   const [flagModalOpen, setFlagModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState('');
   const statusMeta = STATUS_DEFINITIONS[tip.status] || STATUS_DEFINITIONS.pending;
 
   const handleShare = () => {
@@ -70,6 +73,24 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
 
   return (
     <div className="container-narrow" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
+      {isOnChain && <section className="card" style={{padding:'1rem',marginBottom:'1rem'}}>
+        <p>Reviews compare this claim with retrieved public health sources. Each action requires a wallet transaction. Acceptance can precede finalization.</p>
+        {(tip.status === 'pending' || tip.status === 'under-challenge') && <button className="btn btn-primary" disabled={reviewing} onClick={async()=>{
+          setReviewing(true); setReviewError('');
+          try { onTipUpdated(await tipService.reviewTip(tip.id)); }
+          catch(e) {setReviewError(e instanceof Error?e.message:'Review failed.');}
+          finally {setReviewing(false);}
+        }}>{reviewing?'Waiting for validator consensus…':tip.status === 'under-challenge'?'Review challenge':'Review evidence'}</button>}
+        <button className="btn btn-outline" disabled={reviewing} onClick={async()=>{
+          setReviewError(''); try {const updated=await tipService.getTip(tip.id); if(updated) onTipUpdated(updated);}
+          catch(e) {setReviewError(e instanceof Error?e.message:'Refresh failed.');}
+        }}>Refresh result</button>
+        {reviewError && <p role="alert">{reviewError}</p>}
+        {Object.entries(tip.transactions || {}).map(([action,hash])=><p key={action} style={{overflowWrap:'anywhere'}}>{action}: <code>{hash}</code></p>)}
+        {(tip.reviewHistory?.length || 0)>1 && <details><summary>Review history ({tip.reviewHistory!.length})</summary>
+          {tip.reviewHistory!.map((r,i)=><p key={i}>{r.reviewedAt} · {r.status}: {r.reasoning}</p>)}
+        </details>}
+      </section>}
       {/* Top Navigation */}
       <div style={{
         display: 'flex',
@@ -419,13 +440,13 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
                 marginBottom: '0.35rem'
               }}>
                 <Cpu size={15} />
-                <span>GenLayer Intelligent Contract Reference (Future On-Chain Slot):</span>
+                <span>GenLayer review reference:</span>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
                 {tip.review.contractTransactionRef}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.4rem' }}>
-                Note: In this initial frontend release, this represents the planned smart contract interface schema. No actual gas or on-chain transaction has been executed.
+                {isOnChain ? 'Transaction hashes shown here are saved on this browser. Contract records are shared across users.' : 'Demonstration record; no network transaction was executed.'}
               </div>
             </div>
 
