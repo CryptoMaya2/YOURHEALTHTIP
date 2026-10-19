@@ -66,6 +66,19 @@ export const TipCard: React.FC<TipCardProps> = ({ tip, onSelect, featured = fals
                 Your Tip
               </span>
             )}
+            {(tip.safetyAlert || (tip.flagCount && tip.flagCount >= 3)) && (
+              <span style={{
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                backgroundColor: '#fff1f2',
+                color: '#e11d48',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid #fecdd3'
+              }} title="This tip has received independent community safety reports">
+                ⚠️ Community Notice ({tip.flagCount})
+              </span>
+            )}
           </div>
         </div>
 

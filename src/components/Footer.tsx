@@ -234,7 +234,7 @@ export const Footer: React.FC<FooterProps> = ({
           paddingTop: '1.5rem'
         }}>
           <div>
-            © {new Date().getFullYear()} YourHealthTip. Dedicated to transparent public health information.
+            © 2026 YourHealthTip. Dedicated to transparent public health information.
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span>Built for global community health</span>

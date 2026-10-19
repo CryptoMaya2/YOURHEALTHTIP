@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { HealthTip, Category, ReviewStatus } from '../types/tip';
 import { CATEGORIES, STATUS_DEFINITIONS } from '../types/tip';
 import { TipCard } from '../components/TipCard';
@@ -19,12 +19,14 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'all'>(initialCategory);
+  const [prevInitial, setPrevInitial] = useState(initialCategory);
   const [selectedStatus, setSelectedStatus] = useState<ReviewStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'recently-reviewed' | 'oldest'>('newest');
 
-  useEffect(() => {
+  if (prevInitial !== initialCategory) {
+    setPrevInitial(initialCategory);
     setSelectedCategory(initialCategory);
-  }, [initialCategory]);
+  }
 
   // Filter & sort logic
   const filteredTips = useMemo(() => {

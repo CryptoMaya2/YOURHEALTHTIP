@@ -155,6 +155,18 @@ class MockTipService implements ITipService {
 
     const tip = this.tips[index];
 
+    // Duplicate challenge prevention
+    const normReason = input.reason.trim().toLowerCase();
+    const cleanUrl = input.evidenceUrl?.trim().toLowerCase();
+    for (const c of tip.challenges || []) {
+      if (cleanUrl && c.evidenceUrl && c.evidenceUrl.toLowerCase() === cleanUrl) {
+        throw new Error('A challenge citing this evidence URL has already been submitted.');
+      }
+      if (c.reason.trim().toLowerCase() === normReason) {
+        throw new Error('An identical challenge reason has already been submitted.');
+      }
+    }
+
     const newChallenge: Challenge = {
       id: `chal-${Date.now()}`,
       tipId: tip.id,
@@ -194,11 +206,28 @@ class MockTipService implements ITipService {
     return tip?.review || null;
   }
 
-  async flagTip(tipId: string, _reason: string): Promise<boolean> {
+  async flagTip(tipId: string, reason: string): Promise<boolean> {
     await new Promise((resolve) => setTimeout(resolve, 80));
     const tip = this.tips.find((t) => t.id === tipId);
     if (!tip) return false;
-    tip.flagCount = (tip.flagCount || 0) + 1;
+
+    tip.reports = tip.reports || [];
+    if (tip.reports.some((r) => r.reporter === CURRENT_USER_NAME)) {
+      throw new Error('You have already submitted a report for this health tip.');
+    }
+
+    tip.reports.push({
+      reporter: CURRENT_USER_NAME,
+      reason: reason.trim(),
+      reportedAt: new Date().toISOString()
+    });
+
+    tip.flagCount = tip.reports.length;
+    if (tip.flagCount >= 3) {
+      tip.safetyAlert = true;
+      tip.safetyNotice = `Community Safety Notice: This tip has received ${tip.flagCount} independent community reports. Historical consensus evidence is preserved below.`;
+    }
+
     this.saveToStorage();
     return true;
   }

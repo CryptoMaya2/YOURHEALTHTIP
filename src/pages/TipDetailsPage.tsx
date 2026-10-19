@@ -43,9 +43,10 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
   const statusMeta = STATUS_DEFINITIONS[tip.status] || STATUS_DEFINITIONS.pending;
 
   const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?tip=${encodeURIComponent(tip.id)}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleChallengeSubmit = async (input: any) => {
@@ -55,6 +56,8 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
 
   const handleFlagSubmit = async (tipId: string, reason: string) => {
     await tipService.flagTip(tipId, reason);
+    const updated = await tipService.getTip(tipId);
+    if (updated) onTipUpdated(updated);
   };
 
   const formattedSubmittedDate = new Date(tip.submittedAt).toLocaleDateString('en-US', {
@@ -73,6 +76,30 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
 
   return (
     <div className="container-narrow" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
+      {/* Community Safety Alert Banner */}
+      {(tip.safetyAlert || (tip.flagCount && tip.flagCount >= 3)) && (
+        <aside role="alert" style={{
+          backgroundColor: '#fff1f2',
+          border: '1.5px solid #fecdd3',
+          borderRadius: 'var(--radius-lg)',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          gap: '1rem',
+          alignItems: 'flex-start'
+        }}>
+          <AlertTriangle size={24} style={{ color: '#e11d48', flexShrink: 0, marginTop: '0.15rem' }} />
+          <div>
+            <strong style={{ display: 'block', color: '#9f1239', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+              Community Safety Notice ({tip.flagCount} independent user reports)
+            </strong>
+            <p style={{ color: '#be123c', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
+              {tip.safetyNotice || 'This health tip has received multiple independent community safety reports. While all consensus evaluation records and literature citations remain fully preserved below for transparent public auditability, readers should exercise caution and consult qualified healthcare professionals.'}
+            </p>
+          </div>
+        </aside>
+      )}
+
       {isOnChain && <section className="card" style={{padding:'1rem',marginBottom:'1rem'}}>
         <p>Reviews compare this claim with retrieved public health sources. Each action requires a wallet transaction. Acceptance can precede finalization.</p>
         {(tip.status === 'pending' || tip.status === 'under-challenge') && <button className="btn btn-primary" disabled={reviewing} onClick={async()=>{
@@ -85,7 +112,7 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
           setReviewError(''); try {const updated=await tipService.getTip(tip.id); if(updated) onTipUpdated(updated);}
           catch(e) {setReviewError(e instanceof Error?e.message:'Refresh failed.');}
         }}>Refresh result</button>
-        {reviewError && <p role="alert">{reviewError}</p>}
+        {reviewError && <p role="alert" style={{color:'#b91c1c',marginTop:'0.5rem'}}>{reviewError}</p>}
         {Object.entries(tip.transactions || {}).map(([action,hash])=><p key={action} style={{overflowWrap:'anywhere'}}>{action}: <code>{hash}</code></p>)}
         {(tip.reviewHistory?.length || 0)>1 && <details><summary>Review history ({tip.reviewHistory!.length})</summary>
           {tip.reviewHistory!.map((r,i)=><p key={i}>{r.reviewedAt} · {r.status}: {r.reasoning}</p>)}
@@ -123,10 +150,10 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
           <button
             onClick={handleShare}
             className="btn btn-outline btn-sm"
-            title="Share health tip"
+            title="Share health tip direct link"
           >
             <Share2 size={14} />
-            <span>{copied ? 'Link Copied!' : 'Share'}</span>
+            <span>{copied ? 'Link Copied!' : 'Copy Share Link'}</span>
           </button>
 
           <button
@@ -136,7 +163,7 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
             title="Report inappropriate or dangerous health claims"
           >
             <Flag size={14} />
-            <span>Report Concern</span>
+            <span>Report Concern {tip.flagCount ? `(${tip.flagCount})` : ''}</span>
           </button>
         </div>
       </div>
@@ -400,15 +427,31 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
                           <ExternalLink size={13} />
                         </a>
 
-                        <span style={{
-                          fontSize: '0.75rem',
-                          backgroundColor: 'var(--color-bg-subtle)',
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '4px',
-                          color: 'var(--color-text-muted)'
-                        }}>
-                          {source.organization} {source.year && `(${source.year})`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {source.finding && (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              backgroundColor: source.finding === 'supports' ? '#ecfdf5' : source.finding === 'contradicts' ? '#fef2f2' : '#f3f4f6',
+                              color: source.finding === 'supports' ? '#047857' : source.finding === 'contradicts' ? '#b91c1c' : '#4b5563',
+                              border: `1px solid ${source.finding === 'supports' ? '#a7f3d0' : source.finding === 'contradicts' ? '#fecaca' : '#e5e7eb'}`
+                            }}>
+                              {source.finding === 'supports' ? 'Supports Claim' : source.finding === 'contradicts' ? 'Contradicts Claim' : source.finding === 'irrelevant' ? 'Irrelevant' : 'Insufficient'}
+                            </span>
+                          )}
+                          <span style={{
+                            fontSize: '0.75rem',
+                            backgroundColor: 'var(--color-bg-subtle)',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px',
+                            color: 'var(--color-text-muted)'
+                          }}>
+                            {source.organization} {source.year && `(${source.year})`}
+                          </span>
+                        </div>
                       </div>
 
                       <p style={{
@@ -416,11 +459,14 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
                         color: 'var(--color-text-secondary)',
                         lineHeight: 1.5,
                         fontStyle: 'italic',
-                        borderLeft: '2px solid var(--color-brand-olive-border)',
+                        borderLeft: '3px solid var(--color-brand-olive)',
                         paddingLeft: '0.75rem',
-                        marginTop: '0.4rem'
+                        marginTop: '0.5rem',
+                        backgroundColor: '#fafaf9',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '0 4px 4px 0'
                       }}>
-                        "{source.excerpt}"
+                        {source.excerpt ? `"${source.excerpt}"` : 'No direct verbatim passage extracted.'}
                       </p>
                     </div>
                   ))}

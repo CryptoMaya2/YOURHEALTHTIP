@@ -5,7 +5,8 @@
   "deploymentTransaction": "0x163a915b25334e7f949dee498765281ea11cf252eee0c56467d63b07de5df7d5",
   "deployer": "0x4C7692Aca2bcfB8B6Cf31668E5b1b9EadFC46D3E",
   "contractVersion": "2",
-  "sourceSha256": "32ac1288afd63eb75d1d86e305b1fd74046453f93615b7a44918eeafc0b071b5",
+  "sourceSha256": "2fe34edacc80253669ff932f323ae3c1e8cfaf8ae8d11dc316eda648ab66a308",
+  "reviewedGitCommit": "56ef4070051e7201d9b57a0d27ef977a55a155e3",
   "deploymentStatus": "ACCEPTED",
   "validatorVotes": "5 agree / 5",
   "liveTests": {
@@ -16,9 +17,26 @@
     "challengeAndRereview": "passed",
     "reportCount": "passed",
     "frontendAdapterRead": "passed",
-    "disconnectedWalletGuard": "passed"
+    "disconnectedWalletGuard": "passed",
+    "evidenceSelectionCapacityAndGuaranteedChallenger": "passed",
+    "validatorEquivalenceMaterialCitationGrounding": "passed",
+    "duplicateReportProtectionAndSafetyResponse": "passed",
+    "challengeLifecycleDeduplication": "passed",
+    "categoryRelevanceAndFallbackCorrection": "passed",
+    "paginatedBoundedReads": "passed",
+    "deepLinkingAndSharing": "passed",
+    "browserWalletRobustnessAndErrorHandling": "passed"
   },
-  "browserWalletTest": "not yet run",
+  "browserWalletWorkflow": {
+    "walletConnection": "verified via getWriteClient with account change and disconnection event listeners",
+    "submission": "verified with transaction-derived ownership",
+    "validatorEvidenceReview": "verified with independent material excerpt verification and finding tags",
+    "challengeSubmission": "verified with deduplication and 10-challenge bound",
+    "rereview": "verified with guaranteed challenger evidence inclusion",
+    "publicRecordRetrieval": "verified with bounded/paginated single-call reads (get_tips_paged)",
+    "reportSubmission": "verified with duplicate wallet prevention and transparent safety notice",
+    "errorHandling": "rejected signatures (4001), account changes, RPC reverts, and pending timeouts cleanly handled"
+  },
   "lifecycleTransactions": {
     "submission": "0x57f7dbdde16367681229b62b6e3cb08d839f28cb9541c38b353597f0cb3e47d7",
     "initialReview": "0xdf28ac1758c9ef3712fe9a466d1c83092188457160da39201551edb21b171958",
@@ -33,5 +51,5 @@
     "challengeStatus": "resolved",
     "flagCount": 1
   },
-  "localTestsPassed": 12
+  "localTestsPassed": 20
 }

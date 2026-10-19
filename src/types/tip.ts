@@ -117,6 +117,13 @@ export interface EvidenceSource {
   organization: string;
   year?: string;
   excerpt: string;
+  finding?: 'supports' | 'contradicts' | 'insufficient' | 'irrelevant';
+}
+
+export interface TipReport {
+  reporter: string;
+  reason: string;
+  reportedAt: string;
 }
 
 export interface ReviewRecord {
@@ -155,6 +162,9 @@ export interface HealthTip {
   challenges?: Challenge[];
   isSampleData: boolean;
   flagCount?: number;
+  reports?: TipReport[];
+  safetyAlert?: boolean;
+  safetyNotice?: string;
   reviewHistory?: ReviewRecord[];
   transactions?: Record<string, string>;
 }

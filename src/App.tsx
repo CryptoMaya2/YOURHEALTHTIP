@@ -1,4 +1,4 @@
-import { useState, useEffect, useSyncExternalStore } from 'react';
+import { useState, useEffect, useSyncExternalStore, useCallback } from 'react';
 import type { HealthTip, Category } from './types/tip';
 import { WalletPanel } from './components/WalletPanel';
 import { getWalletAddress, subscribeWallet } from './services/wallet';
@@ -13,15 +13,32 @@ import { TipDetailsPage } from './pages/TipDetailsPage';
 import { MySubmissionsPage } from './pages/MySubmissionsPage';
 import { AboutModal, DisclaimerModal, PrivacyModal, ContactModal } from './components/InfoModals';
 
+function getTipIdFromUrl(): string | null {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromSearch = searchParams.get('tip');
+    if (fromSearch) return fromSearch.trim();
+
+    const hash = window.location.hash;
+    if (hash.startsWith('#/tip/') || hash.startsWith('#tip=')) {
+      return decodeURIComponent(hash.replace(/^#(?:(?:\/tip\/)|(?:tip=))/, '')).trim();
+    }
+  } catch {
+    /* ignore url parse errors */
+  }
+  return null;
+}
+
 export function App() {
   const walletAddress = useSyncExternalStore(subscribeWallet, getWalletAddress, () => null);
-  const [currentPage, setCurrentPage] = useState<string>('home');
+  const initialTipId = getTipIdFromUrl();
+  const [currentPage, setCurrentPage] = useState<string>(initialTipId ? 'details' : 'home');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<Category | 'all'>('all');
-  const [selectedTipId, setSelectedTipId] = useState<string | null>(null);
+  const [selectedTipId, setSelectedTipId] = useState<string | null>(initialTipId);
 
   const [tips, setTips] = useState<HealthTip[]>([]);
+  const [directTip, setDirectTip] = useState<HealthTip | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Modals state
@@ -30,23 +47,78 @@ export function App() {
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
 
-  // Load tips on mount
-  const refreshTips = async () => {
+  // Load tips
+  const refreshTips = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const data = await tipService.listTips();
       setTips(data);
+
+      const currentUrlTipId = getTipIdFromUrl();
+      if (currentUrlTipId && !data.some(t => t.id === currentUrlTipId)) {
+        try {
+          const direct = await tipService.getTip(currentUrlTipId);
+          if (direct) {
+            setDirectTip(direct);
+            setSelectedTipId(direct.id);
+            setCurrentPage('details');
+          }
+        } catch {
+          /* tip may not exist */
+        }
+      }
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Could not load health tips. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    refreshTips();
+    let ignore = false;
+    const load = async () => {
+      try {
+        const data = await tipService.listTips();
+        if (!ignore) {
+          setTips(data);
+          const currentUrlTipId = getTipIdFromUrl();
+          if (currentUrlTipId && !data.some(t => t.id === currentUrlTipId)) {
+            const direct = await tipService.getTip(currentUrlTipId);
+            if (direct && !ignore) {
+              setDirectTip(direct);
+              setSelectedTipId(direct.id);
+              setCurrentPage('details');
+            }
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setLoadError(err instanceof Error ? err.message : 'Could not load health tips. Please try again.');
+          setLoading(false);
+        }
+      }
+    };
+    void load();
+    return () => { ignore = true; };
   }, [walletAddress]);
+
+  // Sync with browser Back/Forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const tipId = getTipIdFromUrl();
+      if (tipId) {
+        setSelectedTipId(tipId);
+        setCurrentPage('details');
+      } else {
+        setSelectedTipId(null);
+        setCurrentPage('explore');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Handle Navigation
   const handleNavigate = (page: string, params?: { tipId?: string; category?: string }) => {
@@ -61,15 +133,31 @@ export function App() {
     if (params?.tipId) {
       setSelectedTipId(params.tipId);
       setCurrentPage('details');
+      try {
+        window.history.pushState(null, '', `?tip=${encodeURIComponent(params.tipId)}`);
+      } catch {
+        /* ignore */
+      }
       return;
     }
 
+    setSelectedTipId(null);
+    try {
+      window.history.pushState(null, '', window.location.pathname);
+    } catch {
+      /* ignore */
+    }
     setCurrentPage(page);
   };
 
   const handleSelectTip = (tipId: string) => {
     setSelectedTipId(tipId);
     setCurrentPage('details');
+    try {
+      window.history.pushState(null, '', `?tip=${encodeURIComponent(tipId)}`);
+    } catch {
+      /* ignore */
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -79,6 +167,9 @@ export function App() {
 
   const handleTipUpdated = (updatedTip: HealthTip) => {
     setTips((prev) => prev.map((t) => (t.id === updatedTip.id ? updatedTip : t)));
+    if (directTip && directTip.id === updatedTip.id) {
+      setDirectTip(updatedTip);
+    }
   };
 
   const handleResetSampleData = async () => {
@@ -88,7 +179,9 @@ export function App() {
     }
   };
 
-  const activeTip = selectedTipId ? tips.find((t) => t.id === selectedTipId) || null : null;
+  const activeTip = selectedTipId
+    ? tips.find((t) => t.id === selectedTipId) || (directTip && directTip.id === selectedTipId ? directTip : null)
+    : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -162,7 +255,7 @@ export function App() {
                     Health Tip Not Found
                   </h2>
                   <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1.5rem' }}>
-                    The requested health tip could not be found or may have been reset in the local repository.
+                    The requested health tip could not be found or may have been reset in the repository.
                   </p>
                   <button onClick={() => handleNavigate('explore')} className="btn btn-primary">
                     Return to Explore Feed
