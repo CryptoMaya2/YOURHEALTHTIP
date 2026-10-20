@@ -49,6 +49,26 @@ class ContractTests(unittest.TestCase):
         self.c = module.YourHealthTip()
         self.c.tips = {}
         self.c.tip_ids = []
+        self.c.reported_wallets = {}
+        self.c.challenge_keys = {}
+        self.c.history = {}
+        original_challenge = self.c.challenge_tip
+        def challenge(*args, **kwargs):
+            old_side_effect = gl.nondet.exec_prompt.side_effect
+            old_return = gl.nondet.exec_prompt.return_value
+            def prompt(value):
+                if value.startswith('Challenge admission:'):
+                    return json.dumps(dict(relevant=True, contradictory=True,
+                        excerpt='physical activity prevents disease and supports well-being.',
+                        justification='This is new material contradictory evidence concerning this claim.'))
+                return old_return
+            gl.nondet.exec_prompt.side_effect = prompt
+            try:
+                return original_challenge(*args, **kwargs)
+            finally:
+                gl.nondet.exec_prompt.side_effect = old_side_effect
+                gl.nondet.exec_prompt.return_value = old_return
+        self.c.challenge_tip = challenge
         gl.message.sender_address = '0x' + '1' * 40
         gl.nondet.web.render.reset_mock(side_effect=True, return_value=True)
         gl.nondet.web.get.reset_mock(side_effect=True, return_value=True)
@@ -63,7 +83,7 @@ class ContractTests(unittest.TestCase):
             'sources': [{
                 'url': 'https://www.who.int/news-room/fact-sheets/detail/noncommunicable-diseases',
                 'finding': 'supports',
-                'excerpt': 'physical activity prevents disease and supports well-being.'
+                'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'
             }]
         })
 
@@ -113,7 +133,7 @@ class ContractTests(unittest.TestCase):
             body=('<main>Public health evidence states that physical activity prevents disease and supports well-being. ' * 10 + '</main>').encode()
         )
         self.assertEqual(self.c.review_tip('tip1'), 'evidence-consistent')
-        self.assertEqual(gl.nondet.web.get.call_count, 2)
+        self.assertEqual(sum(1 for call in gl.nondet.web.get.call_args_list if '?term=' not in call.args[0]), 2)
 
     def test_missing_evidence_is_undetermined(self):
         self.submit()
@@ -127,7 +147,7 @@ class ContractTests(unittest.TestCase):
             json.dumps({'status': s, 'confidence': 80, 'reasoning': 'Result',
                         'sources': [{'url': 'https://www.who.int/news-room/fact-sheets/detail/noncommunicable-diseases',
                                      'finding': 'supports' if s == 'evidence-consistent' else 'contradicts',
-                                     'excerpt': 'physical activity prevents disease and supports well-being.'}]})
+                                     'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'}]})
             for s in ['evidence-consistent', 'evidence-inconsistent']
         ]
         with self.assertRaisesRegex(ValueError, 'disagreed'):
@@ -147,7 +167,7 @@ class ContractTests(unittest.TestCase):
             'sources': [{
                 'url': 'https://www.cdc.gov/sleep/about/index.html',
                 'finding': 'supports',
-                'excerpt': 'physical activity prevents disease and supports well-being.'
+                'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'
             }]
         })
         self.c.challenge_tip('tip1', 'Spoof', 'Contradicting evidence should be considered.', 'https://www.cdc.gov/sleep/about/index.html')
@@ -192,7 +212,7 @@ class ContractTests(unittest.TestCase):
             'status': 'evidence-consistent',
             'confidence': 75,
             'reasoning': 'All five sources reviewed.',
-            'sources': [{'url': u, 'finding': 'supports', 'excerpt': 'physical activity prevents disease and supports well-being.'} for u in five_sources]
+            'sources': [{'url': u, 'finding': 'supports', 'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'} for u in five_sources]
         })
         self.c.review_tip('tip_adv')
         
@@ -213,7 +233,7 @@ class ContractTests(unittest.TestCase):
             'status': 'evidence-consistent',
             'confidence': 80,
             'reasoning': 'Re-reviewed with challenger reference included.',
-            'sources': [{'url': u, 'finding': 'supports', 'excerpt': 'physical activity prevents disease and supports well-being.'} for u in five_sources + [challenger_url]]
+            'sources': [{'url': u, 'finding': 'supports', 'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'} for u in five_sources + [challenger_url]]
         })
         self.c.review_tip('tip_adv')
         tip_data = self.tip('tip_adv')
@@ -252,7 +272,7 @@ class ContractTests(unittest.TestCase):
             'sources': [{
                 'url': 'https://www.who.int/news-room/fact-sheets/detail/noncommunicable-diseases',
                 'finding': 'supports',
-                'excerpt': 'physical activity prevents disease and supports well-being.'
+                'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'
             }]
         })
         # Independent validator finds contradiction
@@ -263,7 +283,7 @@ class ContractTests(unittest.TestCase):
             'sources': [{
                 'url': 'https://www.who.int/news-room/fact-sheets/detail/noncommunicable-diseases',
                 'finding': 'contradicts',  # Material finding contradicts leader!
-                'excerpt': 'physical activity prevents disease and supports well-being.'
+                'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'
             }]
         })
         gl.nondet.exec_prompt.side_effect = [leader_output, validator_output]
@@ -320,14 +340,14 @@ class ContractTests(unittest.TestCase):
             'sources': [{
                 'url': challenge_url,
                 'finding': 'supports',
-                'excerpt': 'physical activity prevents disease and supports well-being.'
+                'justification': 'This passage addresses the specific assertion in the health claim.', 'excerpt': 'physical activity prevents disease and supports well-being.'
             }]
         })
         self.c.review_tip('tip1')
         
         # Attempt 1: Repeat challenge with identical evidence URL is rejected
         gl.message.sender_address = '0x' + '6' * 40
-        with self.assertRaisesRegex(ValueError, 'A challenge citing this evidence URL has already been adjudicated|This evidence source was already evaluated'):
+        with self.assertRaisesRegex(ValueError, 'already adjudicated|already evaluated'):
             self.c.challenge_tip('tip1', 'Challenger 2', 'Different reason text but same url.', challenge_url)
 
         # Attempt 2: Repeat challenge with identical reason is rejected
