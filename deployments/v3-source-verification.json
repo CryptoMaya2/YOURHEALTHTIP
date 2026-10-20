@@ -1,0 +1,10 @@
+{
+  "verifiedAt": "2026-10-20T07:37:29.675Z",
+  "chainId": 61999,
+  "contractAddress": "0x2BEF9c69823E50b3a36391a9bb006445c622d163",
+  "contractVersion": "3",
+  "reviewedSourceCommit": "d069948e645b5391c08bd8d2a761e88d010904cc",
+  "sourceSha256": "4ae93111249f3f54d72aadfdb1fcfa5bd022a726b71e0a83cd047725ef9a4a97",
+  "deployedSourceSha256": "4ae93111249f3f54d72aadfdb1fcfa5bd022a726b71e0a83cd047725ef9a4a97",
+  "sourceMatches": true
+}
