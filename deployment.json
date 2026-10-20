@@ -1,55 +1,16 @@
 {
   "network": "GenLayer Studio",
   "chainId": 61999,
-  "contractAddress": "0x282EfF036702383110b4644f1f02b20062C631Bd",
-  "deploymentTransaction": "0x163a915b25334e7f949dee498765281ea11cf252eee0c56467d63b07de5df7d5",
-  "deployer": "0x4C7692Aca2bcfB8B6Cf31668E5b1b9EadFC46D3E",
-  "contractVersion": "2",
-  "sourceSha256": "2fe34edacc80253669ff932f323ae3c1e8cfaf8ae8d11dc316eda648ab66a308",
-  "reviewedGitCommit": "56ef4070051e7201d9b57a0d27ef977a55a155e3",
-  "deploymentStatus": "ACCEPTED",
-  "validatorVotes": "5 agree / 5",
-  "liveTests": {
-    "schemaValidation": "passed",
-    "deployment": "passed",
-    "submission": "passed",
-    "sourceGroundedReview": "passed",
-    "challengeAndRereview": "passed",
-    "reportCount": "passed",
-    "frontendAdapterRead": "passed",
-    "disconnectedWalletGuard": "passed",
-    "evidenceSelectionCapacityAndGuaranteedChallenger": "passed",
-    "validatorEquivalenceMaterialCitationGrounding": "passed",
-    "duplicateReportProtectionAndSafetyResponse": "passed",
-    "challengeLifecycleDeduplication": "passed",
-    "categoryRelevanceAndFallbackCorrection": "passed",
-    "paginatedBoundedReads": "passed",
-    "deepLinkingAndSharing": "passed",
-    "browserWalletRobustnessAndErrorHandling": "passed"
-  },
-  "browserWalletWorkflow": {
-    "walletConnection": "verified via getWriteClient with account change and disconnection event listeners",
-    "submission": "verified with transaction-derived ownership",
-    "validatorEvidenceReview": "verified with independent material excerpt verification and finding tags",
-    "challengeSubmission": "verified with deduplication and 10-challenge bound",
-    "rereview": "verified with guaranteed challenger evidence inclusion",
-    "publicRecordRetrieval": "verified with bounded/paginated single-call reads (get_tips_paged)",
-    "reportSubmission": "verified with duplicate wallet prevention and transparent safety notice",
-    "errorHandling": "rejected signatures (4001), account changes, RPC reverts, and pending timeouts cleanly handled"
-  },
-  "lifecycleTransactions": {
-    "submission": "0x57f7dbdde16367681229b62b6e3cb08d839f28cb9541c38b353597f0cb3e47d7",
-    "initialReview": "0xdf28ac1758c9ef3712fe9a466d1c83092188457160da39201551edb21b171958",
-    "challenge": "0x8289f07a686bfdb47b16fb8f2067c3b4d68ffedaa2091253430c0459324e4b93",
-    "rereview": "0xe0e1df813539ae3762db59ae5cc3906ffa78754f7377950a1cae30891d55189f",
-    "report": "0xf7684b2250497de1ed3a2616bb99f60b9feaf27c075f0f7d9d4b7e4b692b0442"
-  },
-  "testTipId": "test-walk-1792145671851",
-  "testResult": {
-    "status": "evidence-consistent",
-    "reviewCount": 2,
-    "challengeStatus": "resolved",
-    "flagCount": 1
-  },
-  "localTestsPassed": 20
+  "contractVersion": "3",
+  "deploymentStatus": "FINALIZED",
+  "contractAddress": "0x2BEF9c69823E50b3a36391a9bb006445c622d163",
+  "deploymentTransaction": "0x93e29b8a64024e4ca9d2ee3c5cfc174c97694cb677b38a64b8c12bfb22943b07",
+  "reviewedSourceCommit": "d069948e645b5391c08bd8d2a761e88d010904cc",
+  "sourceSha256": "4ae93111249f3f54d72aadfdb1fcfa5bd022a726b71e0a83cd047725ef9a4a97",
+  "browserWalletWorkflow": "NOT_YET_VERIFIED",
+  "historicalDeployment": "deployments/v2-reported.json",
+  "schemaValidation": "PASSED",
+  "sourceVerification": "deployments/v3-source-verification.json",
+  "deploymentReceipt": "deployments/v3-deployment-receipt.json",
+  "sourceCommitPublished": true
 }
