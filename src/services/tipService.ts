@@ -10,6 +10,8 @@ import type {
 import { INITIAL_SAMPLE_TIPS } from './sampleData';
 
 export interface TipFilterOptions {
+  offset?: number;
+  limit?: number;
   category?: Category | 'all';
   status?: ReviewStatus | 'all';
   searchQuery?: string;
@@ -23,6 +25,8 @@ export interface ITipService {
   getTip(id: string): Promise<HealthTip | null>;
   submitTip(input: CreateTipInput): Promise<HealthTip>;
   challengeTip(input: SubmitChallengeInput): Promise<HealthTip>;
+  exportVerificationRecord(tipId: string): Promise<Record<string, unknown>>;
+  getHistory(tipId: string, kind: 'reviews' | 'challenges' | 'reports', offset?: number): Promise<Record<string, unknown>[]>;
   getReviewRecord(tipId: string): Promise<ReviewRecord | null>;
   reviewTip(tipId: string, sourceUrl?: string): Promise<HealthTip>;
   flagTip(tipId: string, reason: string): Promise<boolean>;
@@ -105,7 +109,7 @@ class MockTipService implements ITipService {
       return 0;
     });
 
-    return result;
+    return result.slice(options.offset || 0, (options.offset || 0) + (options.limit || 25));
   }
 
   async getTip(id: string): Promise<HealthTip | null> {
@@ -200,6 +204,17 @@ class MockTipService implements ITipService {
     throw new Error('Live evidence review requires GenLayer mode and a connected wallet.');
   }
 
+  async exportVerificationRecord(tipId: string): Promise<Record<string, unknown>> {
+    return {mode:'local-demo', tip:await this.getTip(tipId), browserWalletVerified:false};
+  }
+
+  async getHistory(tipId: string, kind: 'reviews' | 'challenges' | 'reports', offset = 0): Promise<Record<string, unknown>[]> {
+    const tip = await this.getTip(tipId);
+    const records = kind === 'reviews' ? tip?.reviewHistory || (tip?.review ? [tip.review] : [])
+      : kind === 'challenges' ? tip?.challenges || [] : tip?.reports || [];
+    return records.slice(offset, offset + 10) as unknown as Record<string, unknown>[];
+  }
+
   async getReviewRecord(tipId: string): Promise<ReviewRecord | null> {
     await new Promise((resolve) => setTimeout(resolve, 50));
     const tip = this.tips.find((t) => t.id === tipId);
@@ -243,7 +258,7 @@ export { MockTipService, GenLayerTipService };
 
 // An explicitly selected network service must never silently switch to demo data.
 export function getActiveTipService(): ITipService {
-  return import.meta.env.VITE_USE_GENLAYER_CONTRACT === 'true'
+  return import.meta.env.VITE_USE_GENLAYER_CONTRACT !== 'false'
     ? new GenLayerTipService()
     : new MockTipService();
 }
