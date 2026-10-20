@@ -112,6 +112,7 @@ export const STATUS_DEFINITIONS: Record<ReviewStatus, StatusMeta> = {
 };
 
 export interface EvidenceSource {
+  justification?: string;
   title: string;
   url: string;
   organization: string;
