@@ -39,6 +39,9 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
       return;
     }
 
+    if (!evidenceUrl.trim()) {
+      setError('Provide a new source containing material contradictory evidence.'); return;
+    }
     try {
       setIsSubmitting(true);
       setError(null);
@@ -207,9 +210,10 @@ export const ChallengeModal: React.FC<ChallengeModalProps> = ({
             {/* Evidence URL */}
             <div className="form-group">
               <label className="form-label">
-                Supporting Evidence Link (URL)
+                New contradictory evidence link (required)
               </label>
               <input
+                required
                 type="url"
                 className="form-input"
                 placeholder="https://pubmed.ncbi.nlm.nih.gov/... or https://who.int/..."

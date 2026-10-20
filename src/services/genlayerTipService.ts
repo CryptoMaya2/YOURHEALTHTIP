@@ -1,6 +1,7 @@
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
-import { TransactionStatus } from 'genlayer-js/types';
+import { settleTransaction, signatureError, PendingTransaction, TransactionFailure } from './transactionLifecycle';
+import { TransactionStatus, TransactionHashVariant } from 'genlayer-js/types';
 import type { HealthTip, ReviewRecord, CreateTipInput, SubmitChallengeInput, Category, ReviewStatus, EvidenceSource, TipReport } from '../types/tip';
 import type { ITipService, TipFilterOptions } from './tipService';
 import { getWalletAddress, getWriteClient } from './wallet';
@@ -63,22 +64,28 @@ export class GenLayerTipService implements ITipService {
 
   private async ready() {
     if (!this.isConfigured()) {
-      throw new Error('Set VITE_GENLAYER_CONTRACT_ADDRESS to the deployed v2 contract address.');
+      throw new Error('Set VITE_GENLAYER_CONTRACT_ADDRESS to the deployed v3 contract address.');
     }
     if (!this.versionChecked) {
       try {
         const version = await this.client.readContract({
           address: this.address!,
           functionName: 'get_version',
-          args: []
+          args: [], transactionHashVariant: TransactionHashVariant.LATEST_FINAL
         });
-        if (version !== '2') {
-          throw new Error('This frontend requires the YourHealthTip v2 contract. Deploy the updated contract first.');
+        if (version !== '3') {
+          throw new Error('This frontend requires the YourHealthTip v3 contract. Deploy the updated contract first.');
         }
+        const expected = import.meta.env.VITE_GENLAYER_SOURCE_SHA256;
+        if (!expected || !/^[a-f0-9]{64}$/.test(expected)) throw new Error('Configure VITE_GENLAYER_SOURCE_SHA256 from the verified deployment manifest.');
+        const source = await this.client.getContractCode(this.address!);
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+        const fingerprint = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+        if (fingerprint !== expected) throw new Error('Deployed contract source fingerprint does not match the reviewed source.');
         this.versionChecked = true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('v2 contract')) throw err;
+        if (msg.includes('v3 contract')) throw err;
         throw new Error(`Failed to connect to contract at ${this.address}. RPC response: ${msg}`);
       }
     }
@@ -98,28 +105,15 @@ export class GenLayerTipService implements ITipService {
 
   private async write(id: string, functionName: string, args: Parameters<Client['writeContract']>[0]['args']) {
     await this.ready();
-    const writer = await getWriteClient();
+    const previousHash = this.transactions(id)[`pending_${functionName}`] || (functionName === 'submit_tip' ? this.transactions(id).submit_tip : undefined);
     let hash: Parameters<Client['waitForTransactionReceipt']>[0]['hash'];
-
-    try {
-      hash = await writer.writeContract({
-        address: this.address!,
-        functionName,
-        args,
-        value: 0n
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (
-        (typeof err === 'object' && err !== null && 'code' in err && (err as { code: number }).code === 4001) ||
-        /user rejected|user denied|cancelled|declined/i.test(msg)
-      ) {
-        throw new Error('Transaction declined: Signature request was cancelled in your wallet.');
-      }
-      if (/account changed/i.test(msg)) {
-        throw new Error('Wallet account changed. Please reconnect and retry.');
-      }
-      throw new Error(`Failed to submit transaction to GenLayer: ${msg}`);
+    if (previousHash) {
+      hash = previousHash as typeof hash;
+    } else {
+      const writer = await getWriteClient();
+      try {
+        hash = await writer.writeContract({address: this.address!, functionName, args, value: 0n});
+      } catch (err: unknown) { throw signatureError(err); }
     }
 
     // Persist pending hash before waiting so state is never lost
@@ -133,26 +127,12 @@ export class GenLayerTipService implements ITipService {
     }
 
     try {
-      const receipt = await this.client.waitForTransactionReceipt({
-        hash,
-        status: TransactionStatus.ACCEPTED,
-        retries: 120,
-        interval: 3000
-      });
-
-      const status = String(receipt.statusName || receipt.status);
-      if (
-        !['ACCEPTED', 'FINALIZED', '5', '7'].includes(status) ||
-        (receipt.txExecutionResultName && receipt.txExecutionResultName !== 'FINISHED_WITH_RETURN') ||
-        receipt.consensus_data?.leader_receipt?.some(
-          r => r.mode === 'leader' && (r.error || /error|fail|revert/i.test(r.execution_result))
-        )
-      ) {
-        let revertReason = `Transaction ${hash} did not succeed (${status}).`;
-        const leaderErr = receipt.consensus_data?.leader_receipt?.find(r => r.mode === 'leader')?.execution_result;
-        if (leaderErr) revertReason += ` Execution detail: ${leaderErr}`;
-        throw new Error(revertReason);
-      }
+      const receipt = await settleTransaction(String(hash), () => this.client.waitForTransactionReceipt({
+        hash, status: TransactionStatus.FINALIZED, retries: 120, interval: 3000
+      }));
+      try {
+        localStorage.setItem(`${this.transactionKey(id)}:${hash}:receipt`, JSON.stringify(receipt, (_, value) => typeof value === 'bigint' ? value.toString() : value));
+      } catch { /* optional evidence cache */ }
 
       try {
         const tx = this.transactions(id);
@@ -163,14 +143,15 @@ export class GenLayerTipService implements ITipService {
       }
       return hash;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/did not succeed|Execution detail/i.test(msg)) {
-        throw err;
+      if (err instanceof PendingTransaction) throw err;
+      if (err instanceof TransactionFailure) {
+        try {
+          const tx = this.transactions(id); delete tx[`pending_${functionName}`];
+          localStorage.setItem(this.transactionKey(id), JSON.stringify({...tx, [`failed_${functionName}`]: hash}));
+        } catch { /* optional cache */ }
       }
-      // Receipt timeout or provisional state: never represent as finalized or failed without verification
-      throw new Error(
-        `Transaction ${hash} is pending validator consensus on GenLayer Studio. It has not yet finalized. Please refresh the result in a few moments rather than resubmitting immediately.`
-      );
+      // An explicit failed receipt is a failure, never a pending success.
+      throw err;
     }
   }
 
@@ -186,7 +167,7 @@ export class GenLayerTipService implements ITipService {
         title: s.title || s.url,
         organization: s.organization || (s.url.startsWith('https://') ? s.url.slice(8).split('/')[0] : s.url),
         excerpt: s.excerpt || '',
-        finding: s.finding || 'insufficient'
+        finding: s.finding || 'insufficient', justification: s.justification || ''
       })),
       contractTransactionRef: `Contract: ${this.address}`
     });
@@ -240,31 +221,12 @@ export class GenLayerTipService implements ITipService {
 
     let tips: HealthTip[] = [];
 
-    try {
-      // First attempt efficient paginated read
-      const pagedJson = await this.client.readContract({
-        address: this.address!,
-        functionName: 'get_tips_paged',
-        args: [0, 25]
-      }) as string;
-
-      const rawTips = JSON.parse(pagedJson) as RawTip[];
-      tips = rawTips.map(r => this.mapRawTip(r));
-    } catch {
-      // Fallback for deployments that only support get_all_tip_ids
-      const ids = await this.client.readContract({
-        address: this.address!,
-        functionName: 'get_all_tip_ids',
-        args: []
-      }) as string[];
-
-      // Bounded read (up to 25 items)
-      const boundedIds = ids.slice(0, 25);
-      const fetched = await Promise.all(
-        boundedIds.map(id => this.getTip(id).catch(() => null))
-      );
-      tips = fetched.filter((t): t is HealthTip => t !== null);
-    }
+    const pagedJson = await this.client.readContract({
+      address: this.address!, functionName: 'get_tips_paged',
+      args: [options.offset || 0, Math.min(options.limit || 25, 25)], transactionHashVariant: TransactionHashVariant.LATEST_FINAL
+    }) as string;
+    const rawTips = JSON.parse(pagedJson) as RawTip[];
+    tips = rawTips.map(r => this.mapRawTip(r));
 
     return tips
       .filter(
@@ -290,7 +252,7 @@ export class GenLayerTipService implements ITipService {
       (await this.client.readContract({
         address: this.address!,
         functionName: 'get_tip',
-        args: [id]
+        args: [id], transactionHashVariant: TransactionHashVariant.LATEST_FINAL
       })) as string
     ) as RawTip;
 
@@ -301,7 +263,12 @@ export class GenLayerTipService implements ITipService {
     if (!input.generalHealthAcknowledgement) {
       throw new Error('Confirm the general health educational acknowledgement.');
     }
-    const id = `tip-${crypto.randomUUID()}`;
+    // Recover the same submission after a timeout instead of creating a duplicate tip.
+    const payload = new TextEncoder().encode(JSON.stringify(input));
+    const digest = await crypto.subtle.digest('SHA-256', payload);
+    const draftKey = `yht:${this.address}:${getWalletAddress()}:draft:${Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('')}`;
+    let id = `tip-${crypto.randomUUID()}`;
+    try { id = localStorage.getItem(draftKey) || id; localStorage.setItem(draftKey, id); } catch { /* optional cache */ }
     await this.write(id, 'submit_tip', [
       id,
       input.title.trim(),
@@ -311,7 +278,9 @@ export class GenLayerTipService implements ITipService {
       input.region?.trim() || 'Global',
       JSON.stringify(input.supportingSources || [])
     ]);
-    return (await this.getTip(id))!;
+    const tip = (await this.getTip(id))!;
+    try { localStorage.removeItem(draftKey); } catch { /* optional cache */ }
+    return tip;
   }
 
   async reviewTip(id: string, sourceUrl = '') {
@@ -330,7 +299,30 @@ export class GenLayerTipService implements ITipService {
       input.reason.trim(),
       input.evidenceUrl?.trim() || ''
     ]);
-    return (await this.getTip(input.tipId))!;
+    const tip = (await this.getTip(input.tipId))!;
+    if (tip.status !== 'under-challenge') throw new Error('Finalized challenge state could not be confirmed; refresh before retrying.');
+    return tip;
+  }
+
+  async exportVerificationRecord(id: string): Promise<Record<string, unknown>> {
+    await this.ready();
+    const transactions = this.transactions(id);
+    const receipts: Record<string, unknown> = {};
+    for (const [action, hash] of Object.entries(transactions)) {
+      try { receipts[action] = JSON.parse(localStorage.getItem(`${this.transactionKey(id)}:${hash}:receipt`) || 'null'); }
+      catch { receipts[action] = null; }
+    }
+    return {generatedAt:new Date().toISOString(), browserOrigin:window.location.origin, chainId:studionet.id,
+      contractAddress:this.address, contractVersion:'3', sourceSha256:import.meta.env.VITE_GENLAYER_SOURCE_SHA256,
+      transactions, locallyCapturedReceipts:receipts, finalizedTip:await this.getTip(id),
+      note:'Fetch public receipts independently. Missing lifecycle actions are not verified by this export.'};
+  }
+
+  async getHistory(id: string, kind: 'reviews' | 'challenges' | 'reports', offset = 0): Promise<Record<string, unknown>[]> {
+    await this.ready();
+    const json = await this.client.readContract({address: this.address!, functionName: 'get_history_paged',
+      args: [id, kind, offset, 10], transactionHashVariant: TransactionHashVariant.LATEST_FINAL}) as string;
+    return JSON.parse(json);
   }
 
   async getReviewRecord(id: string) {
@@ -339,6 +331,10 @@ export class GenLayerTipService implements ITipService {
 
   async flagTip(id: string, reason: string) {
     await this.write(id, 'flag_tip', [id, reason]);
+    const tip = await this.getTip(id);
+    if (!tip?.reports?.some(r => r.reporter.toLowerCase() === getWalletAddress()?.toLowerCase())) {
+      throw new Error('Finalized report state could not be confirmed; refresh before retrying.');
+    }
     return true;
   }
 

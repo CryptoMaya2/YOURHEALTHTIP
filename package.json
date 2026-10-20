@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "python3 -m unittest discover -s contracts -v"
+    "test": "npm run test:contract && npm run test:frontend",
+    "test:contract": "python3 -m unittest discover -s contracts -v",
+    "test:frontend": "node --experimental-test-module-mocks --test tests/*.test.ts",
+    "verify:deployment": "node scripts/verify-deployment.mjs"
   },
   "dependencies": {
     "genlayer-js": "^1.1.8",

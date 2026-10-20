@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { HealthTip } from '../types/tip';
+import type { HealthTip, SubmitChallengeInput } from '../types/tip';
 import { STATUS_DEFINITIONS } from '../types/tip';
 import { StatusBadge } from '../components/StatusBadge';
 import { CategoryBadge } from '../components/CategoryBadge';
@@ -36,20 +36,25 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
 }) => {
   const [challengeModalOpen, setChallengeModalOpen] = useState(false);
   const [flagModalOpen, setFlagModalOpen] = useState(false);
+  const [historyKind, setHistoryKind] = useState<'reviews' | 'challenges' | 'reports'>('reviews');
+  const [history, setHistory] = useState<Record<string, unknown>[]>([]);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyEnd, setHistoryEnd] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const statusMeta = STATUS_DEFINITIONS[tip.status] || STATUS_DEFINITIONS.pending;
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const shareUrl = `${window.location.origin}${window.location.pathname}?tip=${encodeURIComponent(tip.id)}`;
-    navigator.clipboard?.writeText(shareUrl);
-    setCopied(true);
+    try { await navigator.clipboard.writeText(shareUrl); setCopied(true); }
+    catch { setReviewError('Could not copy the link. Copy the URL from your address bar.'); }
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleChallengeSubmit = async (input: any) => {
+  const handleChallengeSubmit = async (input: SubmitChallengeInput) => {
     const updated = await tipService.challengeTip(input);
     onTipUpdated(updated);
   };
@@ -114,6 +119,31 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
         }}>Refresh result</button>
         {reviewError && <p role="alert" style={{color:'#b91c1c',marginTop:'0.5rem'}}>{reviewError}</p>}
         {Object.entries(tip.transactions || {}).map(([action,hash])=><p key={action} style={{overflowWrap:'anywhere'}}>{action}: <code>{hash}</code></p>)}
+        <button className="btn btn-outline btn-sm" onClick={async () => {
+          try {
+            const record = await tipService.exportVerificationRecord(tip.id);
+            const url = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2)], {type:'application/json'}));
+            const anchor = document.createElement('a'); anchor.href = url; anchor.download = `yourhealthtip-${tip.id}-verification.json`;
+            anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } catch (error) {setReviewError(error instanceof Error ? error.message : 'Could not export verification record.');}
+        }}>Export verification record</button>
+        <details style={{marginTop: '1rem'}}>
+          <summary>Browse complete public history</summary>
+          <label>Record type <select value={historyKind} onChange={e => {
+            setHistoryKind(e.target.value as typeof historyKind); setHistory([]); setHistoryOffset(0); setHistoryEnd(false);
+          }}>
+            <option value="reviews">Reviews</option><option value="challenges">Challenges</option><option value="reports">Reports</option>
+          </select></label>
+          <button className="btn btn-outline btn-sm" disabled={historyBusy || historyEnd} onClick={async () => {
+            setHistoryBusy(true);
+            try {
+              const page = await tipService.getHistory(tip.id, historyKind, historyOffset);
+              setHistory(previous => [...previous, ...page]); setHistoryOffset(previous => previous + page.length); setHistoryEnd(page.length < 10);
+            } catch (error) {setReviewError(error instanceof Error ? error.message : 'Could not retrieve history.');}
+            finally {setHistoryBusy(false);}
+          }}>{historyBusy ? 'Loading…' : historyEnd ? 'All records loaded' : 'Load history page'}</button>
+          {history.map((record, i) => <details key={i}><summary>{historyKind} record {i + 1}</summary><pre style={{whiteSpace:'pre-wrap', overflowWrap:'anywhere'}}>{JSON.stringify(record, null, 2)}</pre></details>)}
+        </details>
         {(tip.reviewHistory?.length || 0)>1 && <details><summary>Review history ({tip.reviewHistory!.length})</summary>
           {tip.reviewHistory!.map((r,i)=><p key={i}>{r.reviewedAt} · {r.status}: {r.reasoning}</p>)}
         </details>}
@@ -466,7 +496,8 @@ export const TipDetailsPage: React.FC<TipDetailsPageProps> = ({
                         padding: '0.5rem 0.75rem',
                         borderRadius: '0 4px 4px 0'
                       }}>
-                        {source.excerpt ? `"${source.excerpt}"` : 'No direct verbatim passage extracted.'}
+                        {source.justification && <p>{source.justification}</p>}
+                      {source.excerpt ? `"${source.excerpt}"` : 'No direct verbatim passage extracted.'}
                       </p>
                     </div>
                   ))}

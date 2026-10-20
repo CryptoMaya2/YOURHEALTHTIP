@@ -208,7 +208,7 @@ export const SubmitPage: React.FC<SubmitPageProps> = ({
             <strong style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--color-brand-charcoal)' }}>
               Contract Pipeline Status:
             </strong>
-            {isOnChain ? 'Your submission was accepted on GenLayer. Open its details from My Submissions and select Review evidence to request a validator evaluation.' : 'This is a local demonstration submission. Live reviews require GenLayer mode.'}
+            {isOnChain ? 'Your submission finalized successfully on GenLayer. Open its details from My Submissions and select Review evidence to request a validator evaluation.' : 'This is a local demonstration submission. Live reviews require GenLayer mode.'}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
