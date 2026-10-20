@@ -37,6 +37,9 @@ export function App() {
   const [selectedTipId, setSelectedTipId] = useState<string | null>(initialTipId);
 
   const [tips, setTips] = useState<HealthTip[]>([]);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [moreAvailable, setMoreAvailable] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [directTip, setDirectTip] = useState<HealthTip | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,6 +57,8 @@ export function App() {
     try {
       const data = await tipService.listTips();
       setTips(data);
+      setMoreAvailable(data.length === 25);
+      setNextOffset(data.length);
 
       const currentUrlTipId = getTipIdFromUrl();
       if (currentUrlTipId && !data.some(t => t.id === currentUrlTipId)) {
@@ -82,6 +87,8 @@ export function App() {
         const data = await tipService.listTips();
         if (!ignore) {
           setTips(data);
+      setMoreAvailable(data.length === 25);
+      setNextOffset(data.length);
           const currentUrlTipId = getTipIdFromUrl();
           if (currentUrlTipId && !data.some(t => t.id === currentUrlTipId)) {
             const direct = await tipService.getTip(currentUrlTipId);
@@ -103,6 +110,15 @@ export function App() {
     void load();
     return () => { ignore = true; };
   }, [walletAddress]);
+
+  useEffect(() => {
+    if (!selectedTipId) return;
+    let ignore = false;
+    void tipService.getTip(selectedTipId).then(tip => {
+      if (!ignore) setDirectTip(tip);
+    }).catch(error => { if (!ignore) setLoadError(error instanceof Error ? error.message : 'Could not load this record.'); });
+    return () => { ignore = true; };
+  }, [selectedTipId]);
 
   // Sync with browser Back/Forward navigation
   useEffect(() => {
@@ -167,9 +183,7 @@ export function App() {
 
   const handleTipUpdated = (updatedTip: HealthTip) => {
     setTips((prev) => prev.map((t) => (t.id === updatedTip.id ? updatedTip : t)));
-    if (directTip && directTip.id === updatedTip.id) {
-      setDirectTip(updatedTip);
-    }
+    setDirectTip(updatedTip);
   };
 
   const handleResetSampleData = async () => {
@@ -180,7 +194,7 @@ export function App() {
   };
 
   const activeTip = selectedTipId
-    ? tips.find((t) => t.id === selectedTipId) || (directTip && directTip.id === selectedTipId ? directTip : null)
+    ? (directTip && directTip.id === selectedTipId ? directTip : null) || tips.find((t) => t.id === selectedTipId)
     : null;
 
   return (
@@ -245,6 +259,7 @@ export function App() {
             {currentPage === 'details' && (
               activeTip ? (
                 <TipDetailsPage
+                  key={activeTip.id}
                   tip={activeTip}
                   onBack={() => handleNavigate('explore')}
                   onTipUpdated={handleTipUpdated}
@@ -273,6 +288,20 @@ export function App() {
               />
             )}
           </>
+        )}
+        {!loading && ['home', 'explore', 'my-submissions'].includes(currentPage) && moreAvailable && (
+          <div className="container" style={{padding: '1rem'}}>
+            <button className="btn btn-outline" disabled={loadingMore} onClick={async () => {
+              setLoadingMore(true);
+              try {
+                const page = await tipService.listTips({offset: nextOffset, limit: 25});
+                setMoreAvailable(page.length === 25);
+                setNextOffset(previous => previous + page.length);
+                setTips(previous => [...previous, ...page.filter(t => !previous.some(p => p.id === t.id))]);
+              } catch (error) { setLoadError(error instanceof Error ? error.message : 'Could not load next page.'); }
+              finally { setLoadingMore(false); }
+            }}>{loadingMore ? 'Loading…' : 'Load more health tips'}</button>
+          </div>
         )}
       </main>
 
